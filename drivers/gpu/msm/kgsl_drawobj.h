@@ -105,6 +105,24 @@ struct kgsl_drawobj_sync {
 	unsigned long timeout_jiffies;
 };
 
+<<<<<<< HEAD
+=======
+#define KGSL_FENCE_NAME_LEN 74
+
+#ifdef CONFIG_FENCE_DEBUG
+struct fence_info {
+	char name[KGSL_FENCE_NAME_LEN];
+};
+#endif
+
+struct event_fence_info {
+#ifdef CONFIG_FENCE_DEBUG
+	struct fence_info *fences;
+#endif
+	int num_fences;
+};
+
+>>>>>>> 7bf3819a8da9... drivers: msm: Don't copy fence names by default
 /**
  * struct kgsl_drawobj_sync_event
  * @id: identifer (positiion within the pending bitmap)
