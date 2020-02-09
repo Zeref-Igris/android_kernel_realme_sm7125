@@ -547,6 +547,9 @@ static void exit_mm(void)
 	enter_lazy_tlb(mm, current);
 	task_unlock(current);
 	mm_update_next_owner(mm);
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	clear_thread_flag(TIF_MEMDIE);
+#else
 
 #if defined(OPLUS_FEATURE_VIRTUAL_RESERVE_MEMORY) && defined(CONFIG_OPPO_HEALTHINFO) && defined(CONFIG_VIRTUAL_RESERVE_MEMORY)
 	trigger_svm_oom_event(mm, 0, 0);
@@ -556,6 +559,7 @@ static void exit_mm(void)
 		exit_oom_victim();
 	if (mm_released)
 		set_tsk_thread_flag(current, TIF_MM_RELEASED);
+#endif
 }
 
 static struct task_struct *find_alive_thread(struct task_struct *p)
