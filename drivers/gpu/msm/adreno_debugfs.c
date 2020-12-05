@@ -131,6 +131,7 @@ static void sync_event_print(struct seq_file *s,
 		break;
 	}
 	case KGSL_CMD_SYNCPOINT_TYPE_FENCE: {
+<<<<<<< HEAD
 #ifdef CONFIG_FENCE_DEBUG
 		int i;
 
@@ -138,6 +139,8 @@ static void sync_event_print(struct seq_file *s,
 			seq_printf(s, "sync: %s",
 				sync_event->info.fences[i].name);
 #endif
+=======
+>>>>>>> f06c5efafa15... msm: kgsl: Remove sync fence names
 		break;
 	}
 	default:
