@@ -222,7 +222,14 @@ static unsigned int dev_num = 1;
 static struct cdev wlan_hdd_state_cdev;
 static struct class *class;
 static dev_t device;
-static bool hdd_loaded = false;
+
+#define HDD_OPS_INACTIVITY_TIMEOUT (120000)
+#define MAX_OPS_NAME_STRING_SIZE 20
+#define RATE_LIMIT_ERROR_LOG (256)
+
+static qdf_timer_t hdd_drv_ops_inactivity_timer;
+static struct task_struct *hdd_drv_ops_task;
+static char drv_ops_string[MAX_OPS_NAME_STRING_SIZE];
 
 /* the Android framework expects this param even though we don't use it */
 #define BUF_LEN 20
@@ -15767,187 +15774,32 @@ QDF_STATUS hdd_component_psoc_open(struct wlan_objmgr_psoc *psoc)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto err_fwol;
 
-	status = ucfg_pmo_psoc_open(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto err_pmo;
+/**
+ * hdd_module_init() - Module init helper
+ *
+ * Module init helper function used by both module and static driver.
+ *
+ * Return: 0 for success, errno on failure
+ */
+static int __init hdd_module_init(void)
+{
+	if (hdd_driver_load())
+		return -EINVAL;
 
-	status = ucfg_policy_mgr_psoc_open(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto err_plcy_mgr;
-
-	status = ucfg_p2p_psoc_open(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto err_p2p;
-
-	status = ucfg_tdls_psoc_open(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto err_tdls;
-
-	status = ucfg_nan_psoc_open(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto err_nan;
-
-	return status;
-
-err_nan:
-	ucfg_nan_psoc_close(psoc);
-err_tdls:
-	ucfg_tdls_psoc_close(psoc);
-err_p2p:
-	ucfg_p2p_psoc_close(psoc);
-err_plcy_mgr:
-	ucfg_pmo_psoc_close(psoc);
-err_pmo:
-	ucfg_fwol_psoc_close(psoc);
-err_fwol:
-	ucfg_blm_psoc_close(psoc);
-err_blm:
-	ucfg_mlme_psoc_close(psoc);
-
-	return status;
+	return 0;
 }
 
-void hdd_component_psoc_close(struct wlan_objmgr_psoc *psoc)
+/**
+ * hdd_module_exit() - Exit function
+ *
+ * This is the driver exit point (invoked when module is unloaded using rmmod)
+ *
+ * Return: None
+ */
+static void __exit hdd_module_exit(void)
 {
-	ucfg_tdls_psoc_close(psoc);
-	ucfg_p2p_psoc_close(psoc);
-	ucfg_policy_mgr_psoc_close(psoc);
-	ucfg_pmo_psoc_close(psoc);
-	ucfg_fwol_psoc_close(psoc);
-	ucfg_blm_psoc_close(psoc);
-	ucfg_mlme_psoc_close(psoc);
+	hdd_driver_unload();
 }
-
-void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
-{
-	ocb_psoc_enable(psoc);
-	disa_psoc_enable(psoc);
-	nan_psoc_enable(psoc);
-	p2p_psoc_enable(psoc);
-	ucfg_interop_issues_ap_psoc_enable(psoc);
-	policy_mgr_psoc_enable(psoc);
-	ucfg_tdls_psoc_enable(psoc);
-}
-
-void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
-{
-	ucfg_tdls_psoc_disable(psoc);
-	policy_mgr_psoc_disable(psoc);
-	ucfg_interop_issues_ap_psoc_disable(psoc);
-	p2p_psoc_disable(psoc);
-	nan_psoc_disable(psoc);
-	disa_psoc_disable(psoc);
-	ocb_psoc_disable(psoc);
-}
-
-QDF_STATUS hdd_component_pdev_open(struct wlan_objmgr_pdev *pdev)
-{
-	return ucfg_mlme_pdev_open(pdev);
-}
-
-void hdd_component_pdev_close(struct wlan_objmgr_pdev *pdev)
-{
-	ucfg_mlme_pdev_close(pdev);
-}
-
-static QDF_STATUS hdd_qdf_print_init(void)
-{
-	QDF_STATUS status;
-	int qdf_print_idx;
-
-	status = qdf_print_setup();
-	if (QDF_IS_STATUS_ERROR(status)) {
-		pr_err("Failed qdf_print_setup; status:%u\n", status);
-		return status;
-	}
-
-	qdf_print_idx = qdf_print_ctrl_register(cinfo, NULL, NULL, "MCL_WLAN");
-	if (qdf_print_idx < 0) {
-		pr_err("Failed to register for qdf_print_ctrl\n");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	qdf_set_pidx(qdf_print_idx);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-static void hdd_qdf_print_deinit(void)
-{
-	int qdf_pidx = qdf_get_pidx();
-
-	qdf_set_pidx(-1);
-	qdf_print_ctrl_cleanup(qdf_pidx);
-
-	/* currently, no qdf print 'un-setup'*/
-}
-
-static QDF_STATUS hdd_qdf_init(void)
-{
-	QDF_STATUS status;
-
-	status = hdd_qdf_print_init();
-	if (QDF_IS_STATUS_ERROR(status))
-		goto exit;
-
-	status = qdf_debugfs_init();
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to init debugfs; status:%u", status);
-		goto print_deinit;
-	}
-
-	qdf_lock_stats_init();
-	qdf_mem_init();
-	qdf_delayed_work_feature_init();
-	qdf_periodic_work_feature_init();
-	qdf_mc_timer_manager_init();
-	qdf_event_list_init();
-
-	status = qdf_talloc_feature_init();
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to init talloc; status:%u", status);
-		goto event_deinit;
-	}
-
-	status = qdf_cpuhp_init();
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to init cpuhp; status:%u", status);
-		goto talloc_deinit;
-	}
-
-	status = qdf_trace_spin_lock_init();
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to init spinlock; status:%u", status);
-		goto cpuhp_deinit;
-	}
-
-	qdf_trace_init();
-	qdf_register_debugcb_init();
-
-	return QDF_STATUS_SUCCESS;
-
-cpuhp_deinit:
-	qdf_cpuhp_deinit();
-talloc_deinit:
-	qdf_talloc_feature_deinit();
-event_deinit:
-	qdf_event_list_destroy();
-	qdf_mc_timer_manager_exit();
-	qdf_periodic_work_feature_deinit();
-	qdf_delayed_work_feature_deinit();
-	qdf_mem_exit();
-	qdf_lock_stats_deinit();
-	qdf_debugfs_exit();
-print_deinit:
-	hdd_qdf_print_deinit();
-
-exit:
-	return status;
-}
-
-static void hdd_qdf_deinit(void)
-{
-	/* currently, no debugcb deinit */
 
 	qdf_trace_deinit();
 
