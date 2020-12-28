@@ -108,12 +108,6 @@ static const struct of_device_id dsi_display_dt_match[] = {
 
 static unsigned int cur_refresh_rate = 60;
 
-static inline bool is_lp_mode(int power_mode)
-{
-	return power_mode == SDE_MODE_DPMS_LP1 ||
-			power_mode == SDE_MODE_DPMS_LP2;
-}
-
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
 {
@@ -6759,12 +6753,9 @@ int dsi_display_validate_mode_change(struct dsi_display *display,
 		/* dfps and dynamic clock with const fps use case */
 		if (dsi_display_mode_switch_dfps(cur_mode, adj_mode)) {
 			dsi_panel_get_dfps_caps(display->panel, &dfps_caps);
-			#ifdef OPLUS_BUG_STABILITY
-			/*liping-m@PSW.MM.Display.LCD,2019/6/20,for 90FPS LCD */
 			if (cur_mode->timing.refresh_rate != adj_mode->timing.refresh_rate) {
-				pr_err("dsi_cmd set fps: %d\n", adj_mode->timing.refresh_rate);
+				WRITE_ONCE(cur_refresh_rate, adj_mode->timing.refresh_rate);
 			}
-			#endif /*OPLUS_BUG_STABILITY*/
 			if (dfps_caps.dfps_support ||
 			    dyn_clk_caps->maintain_const_fps) {
 				pr_debug("mode switch is variable refresh\n");
