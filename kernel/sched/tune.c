@@ -550,6 +550,10 @@ static inline int schedtune_adj_ta(struct task_struct *p)
 	char name_buf[NAME_MAX + 1];
 	int adj = p->signal->oom_score_adj;
 
+	/* We only care about adj == 0 */
+	if (adj != 0)
+		return 0;
+
 	/* Don't touch kthreads */
 	if (p->flags & PF_KTHREAD)
 		return 0;
@@ -558,7 +562,7 @@ static inline int schedtune_adj_ta(struct task_struct *p)
 	cgroup_name(st->css.cgroup, name_buf, sizeof(name_buf));
 	if (!strncmp(name_buf, "top-app", strlen("top-app"))) {
 		pr_debug("top app is %s with adj %i\n", p->comm, adj);
-		return adj == 0 ? 10 : 1;
+		return 1;
 	}
 
 	return 0;
@@ -575,13 +579,7 @@ int schedtune_task_boost(struct task_struct *p)
 	/* Get task boost value */
 	rcu_read_lock();
 	st = task_schedtune(p);
-	task_boost = st->boost;
-#ifdef OPLUS_FEATURE_UIFIRST
-// XieLiujie@BSP.KERNEL.PERFORMANCE, 2020/06/15, Add for UIFirst
-	if (sysctl_uifirst_enabled && sysctl_launcher_boost_enabled && p->static_ux == 2) {
-		task_boost = 60;
-	}
-#endif /* OPLUS_FEATURE_UIFIRST */
+	task_boost = max(st->boost, schedtune_adj_ta(p));
 	rcu_read_unlock();
 
 	return task_boost;
@@ -600,7 +598,7 @@ int schedtune_task_boost_rcu_locked(struct task_struct *p)
 
 	/* Get task boost value */
 	st = task_schedtune(p);
-	task_boost = st->boost;
+	task_boost = max(st->boost, schedtune_adj_ta(p));
 
 	return task_boost;
 }
