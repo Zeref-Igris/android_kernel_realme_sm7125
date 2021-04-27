@@ -1394,6 +1394,7 @@ struct task_struct {
 	/* Used by LSM modules for access restriction: */
 	void				*security;
 #endif
+
 #ifdef OPLUS_FEATURE_UIFIRST
 // XieLiujie@BSP.KERNEL.PERFORMANCE, 2020/05/25, Add for UIFirst
 	int static_ux;
@@ -1419,6 +1420,10 @@ struct task_struct {
 	unsigned in_epoll:1;
 #endif
 #endif /* OPLUS_FEATURE_HEALTHINFO */
+
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	struct task_struct		*simple_lmk_next;
+#endif
 
 	/*
 	 * New fields for task_struct should be added above here, so that
