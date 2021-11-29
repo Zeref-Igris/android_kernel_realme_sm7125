@@ -1,0 +1,2 @@
+2021/11/29 08:05:46 Micro started
+2021/11/29 08:07:51 governor_msm_adreno_tz.c governor_msm_adreno_tz.c
