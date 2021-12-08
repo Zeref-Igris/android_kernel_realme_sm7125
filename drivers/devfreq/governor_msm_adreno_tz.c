@@ -545,7 +545,7 @@ static int tz_handler(struct devfreq *devfreq, unsigned int event, void *data)
 		suspend_start = 0;
 		spin_unlock(&suspend_lock);
 		result = tz_stop(devfreq);
-		break;;
+		break;
 
 	case DEVFREQ_GOV_SUSPEND:
 		result = tz_suspend(devfreq);
