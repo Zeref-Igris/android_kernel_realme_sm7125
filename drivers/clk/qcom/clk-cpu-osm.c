@@ -766,10 +766,6 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	policy->dvfs_possible_from_any_cpu = true;
 	policy->fast_switch_possible = true;
 	policy->driver_data = c;
-	for_each_cpu(cpu, &c->related_cpus) {
-		per_cpu(clk_boost_pcpu, cpu).c = c;
-		per_cpu(clk_boost_pcpu, cpu).max_index = i - 1;
-	}
 
 	cpumask_copy(policy->cpus, &c->related_cpus);
 
