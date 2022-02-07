@@ -50,35 +50,9 @@ struct events {
 };
 static struct events events_group;
 static struct task_struct *events_notify_thread;
-static int touchboost = 0;
 
-/**************************sysfs start********************************/
-/*
- * Userspace sends cpu#:min_freq_value to vote for min_freq_value as the new
- * scaling_min. To withdraw its vote it needs to enter cpu#:0
- */
-static int set_touchboost(const char *buf, const struct kernel_param *kp)
-{
-	int val;
-
- 	if (sscanf(buf, "%d\n", &val) != 1)
- 		return -EINVAL;
-
- 	touchboost = val;
-
-	return 0;
-}
-
- static int get_touchboost(char *buf, const struct kernel_param *kp)
- {
- 	return snprintf(buf, PAGE_SIZE, "%d", touchboost);
- }
-
-static const struct kernel_param_ops param_ops_touchboost = {
- 	.set = set_touchboost,
- 	.get = get_touchboost,
-};
-device_param_cb(touchboost, &param_ops_touchboost, NULL, 0644);
+static unsigned int aggr_big_nr;
+static unsigned int aggr_top_load;
 
 /*******************************sysfs start************************************/
 static int set_touchboost(const char *buf, const struct kernel_param *kp)
@@ -99,7 +73,6 @@ static const struct kernel_param_ops param_ops_touchboost = {
 	.get = get_touchboost,
 };
 device_param_cb(touchboost, &param_ops_touchboost, NULL, 0644);
-
 static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
 {
 	int i, j, ntokens = 0;
@@ -198,7 +171,9 @@ static int set_cpu_max_freq(const char *buf, const struct kernel_param *kp)
 	/* CPU:value pair */
 	if (!(ntokens % 2))
 		return -EINVAL;
+
 	cp = buf;
+
 	cpumask_clear(limit_mask);
 	for (i = 0; i < ntokens; i += 2) {
 		if (sscanf(cp, "%u:%u", &cpu, &val) != 2)
@@ -220,15 +195,15 @@ static int set_cpu_max_freq(const char *buf, const struct kernel_param *kp)
 		i_cpu_stats = &per_cpu(cpu_stats, i);
 		if (cpufreq_get_policy(&policy, i))
 			continue;
-			
+
 		if (cpu_online(i) && (policy.max != i_cpu_stats->max))
 			cpufreq_update_policy(i);
-			
+
 		for_each_cpu(j, policy.related_cpus)
 			cpumask_clear_cpu(j, limit_mask);
 	}
 	put_online_cpus();
-	
+
 	return 0;
 }
 
