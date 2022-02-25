@@ -2052,6 +2052,7 @@ static void ffs_epfiles_destroy(struct ffs_epfile *epfiles, unsigned count)
 static void ffs_func_eps_disable(struct ffs_function *func)
 {
 	struct ffs_ep *ep         = func->eps;
+	struct ffs_data *ffs      = func->ffs;
 	struct ffs_epfile *epfile = func->ffs->epfiles;
 	unsigned count            = func->ffs->eps_count;
 	unsigned long flags;
